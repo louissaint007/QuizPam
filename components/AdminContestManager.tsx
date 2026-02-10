@@ -1,16 +1,21 @@
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { Contest, Question } from '../types';
 
 const AdminContestManager: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [contests, setContests] = useState<Contest[]>([]);
   const [allAvailableQuestions, setAllAvailableQuestions] = useState<Question[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
   
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [contest, setContest] = useState({
     title: '',
     entry_fee_htg: 250,
@@ -65,6 +70,60 @@ const AdminContestManager: React.FC = () => {
     fetchAvailableQuestions();
   }, [fetchAllContests, fetchAvailableQuestions]);
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const uploadImage = async (): Promise<string | null> => {
+    if (!imageFile) return null;
+    
+    setIsUploadingImage(true);
+    try {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `contests/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('contest-images')
+        .upload(filePath, imageFile);
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('contest-images')
+        .getPublicUrl(filePath);
+
+      return data.publicUrl;
+    } catch (err: any) {
+      console.error("Image upload error:", err);
+      alert("Erè nan moute imaj la: " + err.message);
+      return null;
+    } finally {
+      setIsUploadingImage(false);
+    }
+  };
+
   const toggleQuestionSelection = (id: string) => {
     setSelectedQuestionIds(prev => 
       prev.includes(id) ? prev.filter(qid => qid !== id) : [...prev, id]
@@ -72,7 +131,8 @@ const AdminContestManager: React.FC = () => {
   };
 
   const filteredQuestions = allAvailableQuestions.filter(q => {
-    const matchesSearch = q.question_text.toLowerCase().includes(searchQuery.toLowerCase()) || 
+    const qText = q.question_text || "";
+    const matchesSearch = qText.toLowerCase().includes(searchQuery.toLowerCase()) || 
                          q.options.some(opt => opt.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = categoryFilter === '' || q.category === categoryFilter;
     return matchesSearch && matchesCategory;
@@ -85,6 +145,13 @@ const AdminContestManager: React.FC = () => {
     
     setIsSubmitting(true);
     try {
+      // 1. Upload image first if exists
+      let finalImageUrl = contest.image_url;
+      if (imageFile) {
+        const uploadedUrl = await uploadImage();
+        if (uploadedUrl) finalImageUrl = uploadedUrl;
+      }
+
       const contestToInsert = {
         title: contest.title.trim(),
         entry_fee_htg: Number(contest.entry_fee_htg),
@@ -103,7 +170,7 @@ const AdminContestManager: React.FC = () => {
         tenth_prize_percent: Number(contest.tenth_prize_percent),
         status: contest.status,
         category_filter: contest.category_filter.trim() || null,
-        image_url: contest.image_url.trim() || null,
+        image_url: finalImageUrl || null,
         current_participants: 0,
         questions_ids: selectedQuestionIds
       };
@@ -115,6 +182,7 @@ const AdminContestManager: React.FC = () => {
       if (error) throw error;
       
       alert("Konkou kreye avèk siksè !");
+      // Reset form
       setContest({ 
         title: '', 
         entry_fee_htg: 250, 
@@ -136,6 +204,8 @@ const AdminContestManager: React.FC = () => {
         image_url: ''
       });
       setSelectedQuestionIds([]);
+      setImageFile(null);
+      setImagePreview(null);
       fetchAllContests();
     } catch (err: any) {
       alert("Erreur: " + err.message);
@@ -186,14 +256,59 @@ const AdminContestManager: React.FC = () => {
         </h3>
         
         <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-             <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Tit Konkou</label>
-               <input required className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none focus:ring-2 ring-blue-500 transition-all" value={contest.title} onChange={e => setContest({...contest, title: e.target.value})} placeholder="Ex: Gwo defi kilti ayisyèn" />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+             <div className="space-y-6">
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Tit Konkou</label>
+                 <input required className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none focus:ring-2 ring-blue-500 transition-all" value={contest.title} onChange={e => setContest({...contest, title: e.target.value})} placeholder="Ex: Gwo defi kilti ayisyèn" />
+               </div>
+               <div className="space-y-2">
+                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Kategori Filtè (Opsyonèl)</label>
+                 <input className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.category_filter} onChange={e => setContest({...contest, category_filter: e.target.value})} placeholder="Ex: Istwa, Espò..." />
+               </div>
              </div>
+
+             {/* IMAGE UPLOAD SECTION */}
              <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">URL Imaj</label>
-               <input placeholder="https://..." className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none focus:ring-2 ring-blue-500 transition-all" value={contest.image_url} onChange={e => setContest({...contest, image_url: e.target.value})} />
+               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Imaj Konkou (Upload)</label>
+               <div 
+                 onDragOver={(e) => e.preventDefault()}
+                 onDrop={handleDrop}
+                 onClick={() => fileInputRef.current?.click()}
+                 className={`relative h-[164px] border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden ${
+                   imagePreview ? 'border-blue-500 bg-slate-900' : 'border-slate-700 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-800/60'
+                 }`}
+               >
+                 {imagePreview ? (
+                   <>
+                     <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-50" />
+                     <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/40">
+                        <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Chanje Imaj</span>
+                     </div>
+                   </>
+                 ) : (
+                   <div className="text-center p-6">
+                     <div className="w-12 h-12 bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                        <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                     </div>
+                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chwazi Imaj</p>
+                     <p className="text-[9px] text-slate-600 font-medium">JPG, PNG oswa WEBP (Max 2MB)</p>
+                   </div>
+                 )}
+                 <input 
+                   type="file" 
+                   ref={fileInputRef}
+                   onChange={handleFileChange}
+                   accept="image/*"
+                   className="hidden" 
+                 />
+                 {isUploadingImage && (
+                   <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center">
+                     <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                   </div>
+                 )}
+               </div>
              </div>
           </div>
 
@@ -303,10 +418,6 @@ const AdminContestManager: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Kategori Filtè (Opsyonèl)</label>
-               <input className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.category_filter} onChange={e => setContest({...contest, category_filter: e.target.value})} placeholder="Pou UI sèlman" />
-            </div>
-            <div className="space-y-2">
                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Statut Inisyal</label>
                <select className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.status} onChange={e => setContest({...contest, status: e.target.value as any})}>
                   <option value="pending">AP TANN (Pending)</option>
@@ -315,8 +426,8 @@ const AdminContestManager: React.FC = () => {
             </div>
           </div>
 
-          <button type="submit" disabled={isSubmitting} className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-[2rem] shadow-[0_6px_0_rgb(29,78,216)] active:translate-y-1 active:shadow-none uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3">
-            {isSubmitting ? 'PWOSESE...' : 'PUBLIYE KONKOU A'}
+          <button type="submit" disabled={isSubmitting || isUploadingImage} className="w-full py-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-[2rem] shadow-[0_6px_0_rgb(29,78,216)] active:translate-y-1 active:shadow-none uppercase tracking-[0.2em] text-xs transition-all flex items-center justify-center gap-3 disabled:opacity-50">
+            {isSubmitting ? 'PWOSESE...' : isUploadingImage ? 'YAP MOUTE IMAJ...' : 'PUBLIYE KONKOU A'}
           </button>
         </form>
       </div>
