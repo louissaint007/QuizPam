@@ -8,7 +8,62 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800&display=swap" rel="stylesheet">
     <style>
-        body { font-family: 'Inter', sans-serif; }
+        body { font-family: 'Inter', sans-serif; margin: 0; background-color: #020617; }
+        
+        /* Preloader Style */
+        #initial-loader {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #020617;
+            z-index: 9999;
+            transition: opacity 0.5s ease-out, visibility 0.5s;
+        }
+
+        .loader-content {
+            text-align: center;
+            animation: fadeIn 0.8s ease-out forwards;
+        }
+
+        .brand-text {
+            font-size: 3.75rem;
+            font-weight: 900;
+            font-style: italic;
+            letter-spacing: -0.05em;
+            margin-bottom: 1rem;
+            color: white;
+        }
+
+        .brand-quiz { color: #ef4444; }
+
+        .pulse-bar {
+            width: 48px;
+            height: 6px;
+            background-color: #ef4444;
+            border-radius: 9999px;
+            margin: 0 auto;
+            animation: pulse 1.5s infinite ease-in-out;
+        }
+
+        @keyframes pulse {
+            0%, 100% { transform: scaleX(1); opacity: 1; }
+            50% { transform: scaleX(2.5); opacity: 0.5; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        /* Klas pou kache loader a */
+        .loader-hidden {
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+        }
     </style>
 <script type="importmap">
 {
@@ -22,7 +77,17 @@
 }
 </script>
 </head>
-<body class="bg-slate-50 text-slate-900">
+<body class="bg-slate-950">
+    <!-- Splash Screen ki parèt an premye nèt -->
+    <div id="initial-loader">
+        <div class="loader-content">
+            <div class="brand-text">
+                <span class="brand-quiz">Quiz</span>Pam
+            </div>
+            <div class="pulse-bar"></div>
+        </div>
+    </div>
+
     <div id="root"></div>
 </body>
 </html>

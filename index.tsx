@@ -14,3 +14,14 @@ root.render(
     <App />
   </React.StrictMode>
 );
+
+// Retire preloader a yon fwa React fin kòmanse travay
+const preloader = document.getElementById('initial-loader');
+if (preloader) {
+  // Nou bay yon ti delay 100ms pou asire tranzisyon an dous
+  setTimeout(() => {
+    preloader.classList.add('loader-hidden');
+    // Efase l nèt nan DOM la apre animasyon an fini
+    setTimeout(() => preloader.remove(), 500);
+  }, 100);
+}
