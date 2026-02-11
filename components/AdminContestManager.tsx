@@ -11,10 +11,10 @@ const AdminContestManager: React.FC = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('');
   const [selectedQuestionIds, setSelectedQuestionIds] = useState<string[]>([]);
-  
+
   // States pou kònfimasyon ak mesaj
   const [contestToDelete, setContestToDelete] = useState<string | null>(null);
-  const [notification, setNotification] = useState<{message: string, type: 'success' | 'error'} | null>(null);
+  const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' } | null>(null);
 
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
@@ -52,7 +52,7 @@ const AdminContestManager: React.FC = () => {
         .from('contests')
         .select('*')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
       setContests(data || []);
     } catch (err: any) {
@@ -66,7 +66,7 @@ const AdminContestManager: React.FC = () => {
         .from('questions')
         .select('*')
         .eq('is_for_contest', true);
-      
+
       if (error) throw error;
       setAllAvailableQuestions(data || []);
     } catch (err: any) {
@@ -106,7 +106,7 @@ const AdminContestManager: React.FC = () => {
 
   const uploadImage = async (): Promise<string | null> => {
     if (!imageFile) return null;
-    
+
     setIsUploadingImage(true);
     try {
       const fileExt = imageFile.name.split('.').pop();
@@ -134,15 +134,15 @@ const AdminContestManager: React.FC = () => {
   };
 
   const toggleQuestionSelection = (id: string) => {
-    setSelectedQuestionIds(prev => 
+    setSelectedQuestionIds(prev =>
       prev.includes(id) ? prev.filter(qid => qid !== id) : [...prev, id]
     );
   };
 
   const filteredQuestions = allAvailableQuestions.filter(q => {
     const qText = q.question_text || "";
-    const matchesSearch = qText.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                         q.options.some(opt => opt.toLowerCase().includes(searchQuery.toLowerCase()));
+    const matchesSearch = qText.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      q.options.some(opt => opt.toLowerCase().includes(searchQuery.toLowerCase()));
     const matchesCategory = categoryFilter === '' || q.category === categoryFilter;
     return matchesSearch && matchesCategory;
   });
@@ -151,7 +151,7 @@ const AdminContestManager: React.FC = () => {
     e.preventDefault();
     if (!contest.title.trim()) return showNotification("Tit la obligatwa !", 'error');
     if (selectedQuestionIds.length === 0) return showNotification("Ou dwe chwazi omwen yon kesyon pou konkou sa a !", 'error');
-    
+
     setIsSubmitting(true);
     try {
       // 1. Upload image first if exists
@@ -189,14 +189,14 @@ const AdminContestManager: React.FC = () => {
         .insert([contestToInsert]);
 
       if (error) throw error;
-      
+
       showNotification("Konkou kreye avèk siksè !");
       // Reset form
-      setContest({ 
-        title: '', 
-        entry_fee_htg: 250, 
-        min_participants: 100, 
-        admin_margin_percent: 50, 
+      setContest({
+        title: '',
+        entry_fee_htg: 250,
+        min_participants: 100,
+        admin_margin_percent: 50,
         grand_prize: 0,
         first_prize_percent: 20,
         second_prize_percent: 8,
@@ -229,7 +229,7 @@ const AdminContestManager: React.FC = () => {
         .from('contests')
         .update({ status: newStatus })
         .eq('id', id);
-      
+
       if (error) throw error;
       fetchAllContests();
       showNotification(`Statut mizajou: ${newStatus.toUpperCase()}`);
@@ -245,9 +245,9 @@ const AdminContestManager: React.FC = () => {
         .from('contests')
         .delete()
         .eq('id', contestToDelete);
-      
+
       if (error) throw error;
-      
+
       setContests(prev => prev.filter(c => c.id !== contestToDelete));
       showNotification("Konkou efase ak siksè.");
     } catch (err: any) {
@@ -263,9 +263,8 @@ const AdminContestManager: React.FC = () => {
     <div className="space-y-10 relative">
       {/* Toast Notification */}
       {notification && (
-        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 ${
-          notification.type === 'error' ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-green-500/10 border-green-500 text-green-400'
-        }`}>
+        <div className={`fixed top-24 left-1/2 -translate-x-1/2 z-[100] px-6 py-4 rounded-2xl shadow-2xl border flex items-center gap-3 animate-in slide-in-from-top-4 duration-300 ${notification.type === 'error' ? 'bg-red-500/10 border-red-500 text-red-400' : 'bg-green-500/10 border-green-500 text-green-400'
+          }`}>
           <div className={`w-2 h-2 rounded-full animate-pulse ${notification.type === 'error' ? 'bg-red-500' : 'bg-green-500'}`}></div>
           <span className="text-xs font-black uppercase tracking-widest">{notification.message}</span>
         </div>
@@ -274,28 +273,28 @@ const AdminContestManager: React.FC = () => {
       {/* Confirmation Modal */}
       {contestToDelete && (
         <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-slate-950/80 backdrop-blur-sm animate-in fade-in duration-200">
-           <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in duration-300">
-              <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
-                <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-              </div>
-              <h3 className="text-xl font-black text-white text-center mb-2 uppercase tracking-tight">Èske ou sèten?</h3>
-              <p className="text-slate-400 text-center text-xs font-bold leading-relaxed mb-8">Aksyon sa a pral efase konkou a nèt nan baz de done a. Ou p ap ka anile sa.</p>
-              
-              <div className="flex flex-col gap-3">
-                 <button 
-                   onClick={executeDelete}
-                   className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-lg shadow-red-600/20 active:translate-y-1 transition-all"
-                 >
-                   EFÈKTIYÈ EFASMAN
-                 </button>
-                 <button 
-                   onClick={() => setContestToDelete(null)}
-                   className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all"
-                 >
-                   ANNULE
-                 </button>
-              </div>
-           </div>
+          <div className="bg-slate-900 border border-slate-700 w-full max-w-sm rounded-[2.5rem] p-8 shadow-2xl animate-in zoom-in duration-300">
+            <div className="w-20 h-20 bg-red-500/10 text-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6">
+              <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            </div>
+            <h3 className="text-xl font-black text-white text-center mb-2 uppercase tracking-tight">Èske ou sèten?</h3>
+            <p className="text-slate-400 text-center text-xs font-bold leading-relaxed mb-8">Aksyon sa a pral efase konkou a nèt nan baz de done a. Ou p ap ka anile sa.</p>
+
+            <div className="flex flex-col gap-3">
+              <button
+                onClick={executeDelete}
+                className="w-full py-4 bg-red-600 hover:bg-red-500 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest shadow-lg shadow-red-600/20 active:translate-y-1 transition-all"
+              >
+                EFÈKTIYÈ EFASMAN
+              </button>
+              <button
+                onClick={() => setContestToDelete(null)}
+                className="w-full py-4 bg-slate-800 hover:bg-slate-700 text-slate-300 font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all"
+              >
+                ANNULE
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -304,175 +303,172 @@ const AdminContestManager: React.FC = () => {
           <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
           Kreye yon Konkou
         </h3>
-        
+
         <form onSubmit={handleSubmit} className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-             <div className="space-y-6">
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Tit Konkou</label>
-                 <input required className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none focus:ring-2 ring-blue-500 transition-all" value={contest.title} onChange={e => setContest({...contest, title: e.target.value})} placeholder="Ex: Gwo defi kilti ayisyèn" />
-               </div>
-               <div className="space-y-2">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Kategori Filtè (Opsyonèl)</label>
-                 <input className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.category_filter} onChange={e => setContest({...contest, category_filter: e.target.value})} placeholder="Ex: Istwa, Espò..." />
-               </div>
-             </div>
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Tit Konkou</label>
+                <input required className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none focus:ring-2 ring-blue-500 transition-all" value={contest.title} onChange={e => setContest({ ...contest, title: e.target.value })} placeholder="Ex: Gwo defi kilti ayisyèn" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Kategori Filtè (Opsyonèl)</label>
+                <input className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.category_filter} onChange={e => setContest({ ...contest, category_filter: e.target.value })} placeholder="Ex: Istwa, Espò..." />
+              </div>
+            </div>
 
-             {/* IMAGE UPLOAD SECTION */}
-             <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Imaj Konkou (Upload)</label>
-               <div 
-                 onDragOver={(e) => e.preventDefault()}
-                 onDrop={handleDrop}
-                 onClick={() => fileInputRef.current?.click()}
-                 className={`relative h-[164px] border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden ${
-                   imagePreview ? 'border-blue-500 bg-slate-900' : 'border-slate-700 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-800/60'
-                 }`}
-               >
-                 {imagePreview ? (
-                   <>
-                     <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-50" />
-                     <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/40">
-                        <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                        <span className="text-[10px] font-black uppercase tracking-widest">Chanje Imaj</span>
-                     </div>
-                   </>
-                 ) : (
-                   <div className="text-center p-6">
-                     <div className="w-12 h-12 bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-3">
-                        <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                     </div>
-                     <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chwazi Imaj</p>
-                     <p className="text-[9px] text-slate-600 font-medium">JPG, PNG oswa WEBP (Max 2MB)</p>
-                   </div>
-                 )}
-                 <input 
-                   type="file" 
-                   ref={fileInputRef}
-                   onChange={handleFileChange}
-                   accept="image/*"
-                   className="hidden" 
-                 />
-                 {isUploadingImage && (
-                   <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center">
-                     <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
-                   </div>
-                 )}
-               </div>
-             </div>
+            {/* IMAGE UPLOAD SECTION */}
+            <div className="space-y-2">
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Imaj Konkou (Upload)</label>
+              <div
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`relative h-[164px] border-2 border-dashed rounded-[2rem] transition-all flex flex-col items-center justify-center cursor-pointer overflow-hidden ${imagePreview ? 'border-blue-500 bg-slate-900' : 'border-slate-700 bg-slate-800/40 hover:border-slate-500 hover:bg-slate-800/60'
+                  }`}
+              >
+                {imagePreview ? (
+                  <>
+                    <img src={imagePreview} alt="Preview" className="w-full h-full object-cover opacity-50" />
+                    <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black/40">
+                      <svg className="w-8 h-8 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                      <span className="text-[10px] font-black uppercase tracking-widest">Chanje Imaj</span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="text-center p-6">
+                    <div className="w-12 h-12 bg-slate-700/50 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                      <svg className="w-6 h-6 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400 uppercase tracking-widest mb-1">Chwazi Imaj</p>
+                    <p className="text-[9px] text-slate-600 font-medium">JPG, PNG oswa WEBP (Max 2MB)</p>
+                  </div>
+                )}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="hidden"
+                />
+                {isUploadingImage && (
+                  <div className="absolute inset-0 bg-slate-900/80 backdrop-blur-sm flex items-center justify-center">
+                    <div className="w-6 h-6 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                  </div>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="p-6 bg-slate-900/60 rounded-3xl border border-slate-800 space-y-6">
             <h4 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em] border-b border-slate-800 pb-3">Konfigirasyon Pri ak Frè</h4>
-            
+
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-               <div className="space-y-1">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Frè (HTG)</label>
-                 <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-yellow-400 font-black outline-none focus:ring-2 ring-yellow-400" value={contest.entry_fee_htg} onChange={e => setContest({...contest, entry_fee_htg: Number(e.target.value)})} />
-               </div>
-               <div className="space-y-1">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Min. Jwè</label>
-                 <input type="number" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-black outline-none" value={contest.min_participants} onChange={e => setContest({...contest, min_participants: Number(e.target.value)})} />
-               </div>
-               <div className="space-y-1">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Marge Admin (%)</label>
-                 <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-blue-400 font-black outline-none" value={contest.admin_margin_percent} onChange={e => setContest({...contest, admin_margin_percent: Number(e.target.value)})} />
-               </div>
-               <div className="space-y-1">
-                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Pool pou Genyen (HTG)</label>
-                 <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-green-400 font-black outline-none" value={contest.grand_prize} onChange={e => setContest({...contest, grand_prize: Number(e.target.value)})} />
-               </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Frè (HTG)</label>
+                <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-yellow-400 font-black outline-none focus:ring-2 ring-yellow-400" value={contest.entry_fee_htg} onChange={e => setContest({ ...contest, entry_fee_htg: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Min. Jwè</label>
+                <input type="number" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-black outline-none" value={contest.min_participants} onChange={e => setContest({ ...contest, min_participants: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Marge Admin (%)</label>
+                <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-blue-400 font-black outline-none" value={contest.admin_margin_percent} onChange={e => setContest({ ...contest, admin_margin_percent: Number(e.target.value) })} />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Pool pou Genyen (HTG)</label>
+                <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-green-400 font-black outline-none" value={contest.grand_prize} onChange={e => setContest({ ...contest, grand_prize: Number(e.target.value) })} />
+              </div>
             </div>
 
             {/* Questions Picker Section */}
             <div className="space-y-4 pt-4 border-t border-slate-800">
-               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                  <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-blue-500 pl-3">Seleksyon Kesyon ({selectedQuestionIds.length})</h4>
-                  <div className="flex gap-2 w-full md:w-auto">
-                     <select 
-                        className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-[10px] font-bold outline-none"
-                        value={categoryFilter}
-                        onChange={e => setCategoryFilter(e.target.value)}
-                     >
-                        <option value="">Tout Kategori</option>
-                        {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
-                     </select>
-                     <input 
-                        type="text" 
-                        placeholder="Chèche mo kle..." 
-                        className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-[10px] font-bold outline-none"
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                     />
-                  </div>
-               </div>
+              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <h4 className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-blue-500 pl-3">Seleksyon Kesyon ({selectedQuestionIds.length})</h4>
+                <div className="flex gap-2 w-full md:w-auto">
+                  <select
+                    className="bg-slate-800 border border-slate-700 rounded-xl px-3 py-2 text-[10px] font-bold outline-none"
+                    value={categoryFilter}
+                    onChange={e => setCategoryFilter(e.target.value)}
+                  >
+                    <option value="">Tout Kategori</option>
+                    {categories.map(cat => <option key={cat} value={cat}>{cat}</option>)}
+                  </select>
+                  <input
+                    type="text"
+                    placeholder="Chèche mo kle..."
+                    className="flex-1 bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-[10px] font-bold outline-none"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                  />
+                </div>
+              </div>
 
-               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-2 bg-slate-950/30 rounded-2xl border border-slate-800">
-                  {filteredQuestions.length > 0 ? filteredQuestions.map(q => {
-                    const isSelected = selectedQuestionIds.includes(q.id);
-                    return (
-                      <div 
-                        key={q.id} 
-                        onClick={() => toggleQuestionSelection(q.id)}
-                        className={`p-4 rounded-xl border cursor-pointer transition-all flex justify-between items-center group ${
-                          isSelected ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-800/40 border-slate-700 hover:border-slate-500'
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto p-2 bg-slate-950/30 rounded-2xl border border-slate-800">
+                {filteredQuestions.length > 0 ? filteredQuestions.map(q => {
+                  const isSelected = selectedQuestionIds.includes(q.id);
+                  return (
+                    <div
+                      key={q.id}
+                      onClick={() => toggleQuestionSelection(q.id)}
+                      className={`p-4 rounded-xl border cursor-pointer transition-all flex justify-between items-center group ${isSelected ? 'bg-blue-600/20 border-blue-500' : 'bg-slate-800/40 border-slate-700 hover:border-slate-500'
                         }`}
-                      >
-                        <div className="flex-1 pr-4">
-                          <p className="text-[10px] font-black text-slate-500 uppercase mb-1">{q.category}</p>
-                          <p className="text-xs font-bold text-white line-clamp-2 leading-snug">{q.question_text}</p>
-                        </div>
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${
-                          isSelected ? 'bg-blue-500 border-blue-400 scale-110' : 'border-slate-600 group-hover:border-slate-400'
-                        }`}>
-                          {isSelected && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
-                        </div>
+                    >
+                      <div className="flex-1 pr-4">
+                        <p className="text-[10px] font-black text-slate-500 uppercase mb-1">{q.category}</p>
+                        <p className="text-xs font-bold text-white line-clamp-2 leading-snug">{q.question_text}</p>
                       </div>
-                    );
-                  }) : (
-                    <div className="col-span-full py-10 text-center text-slate-600 italic text-xs">Pa gen kesyon ki koresponn ak rechèch ou a...</div>
-                  )}
-               </div>
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 border-2 transition-all ${isSelected ? 'bg-blue-500 border-blue-400 scale-110' : 'border-slate-600 group-hover:border-slate-400'
+                        }`}>
+                        {isSelected && <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" /></svg>}
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <div className="col-span-full py-10 text-center text-slate-600 italic text-xs">Pa gen kesyon ki koresponn ak rechèch ou a...</div>
+                )}
+              </div>
             </div>
 
             <div className="space-y-4">
               <label className="text-xs font-black text-slate-400 uppercase tracking-widest border-l-4 border-blue-500 pl-3">Distribisyon nan Pool la (%)</label>
-              
+
               <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                 {[
-                   { label: '1e', key: 'first_prize_percent' },
-                   { label: '2e', key: 'second_prize_percent' },
-                   { label: '3e', key: 'third_prize_percent' },
-                   { label: '4e', key: 'fourth_prize_percent' },
-                   { label: '5e', key: 'fifth_prize_percent' },
-                   { label: '6e', key: 'sixth_prize_percent' },
-                   { label: '7e', key: 'seventh_prize_percent' },
-                   { label: '8e', key: 'eighth_prize_percent' },
-                   { label: '9e', key: 'ninth_prize_percent' },
-                   { label: '10e', key: 'tenth_prize_percent' },
-                 ].map((p) => (
-                   <div key={p.key} className="space-y-1">
-                     <label className="text-[10px] font-black text-slate-500 uppercase ml-2">{p.label}</label>
-                     <input 
-                       type="number" 
-                       step="any" 
-                       className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 ring-blue-500" 
-                       value={(contest as any)[p.key]} 
-                       onChange={e => setContest({...contest, [p.key]: Number(e.target.value)})} 
-                     />
-                   </div>
-                 ))}
+                {[
+                  { label: '1e', key: 'first_prize_percent' },
+                  { label: '2e', key: 'second_prize_percent' },
+                  { label: '3e', key: 'third_prize_percent' },
+                  { label: '4e', key: 'fourth_prize_percent' },
+                  { label: '5e', key: 'fifth_prize_percent' },
+                  { label: '6e', key: 'sixth_prize_percent' },
+                  { label: '7e', key: 'seventh_prize_percent' },
+                  { label: '8e', key: 'eighth_prize_percent' },
+                  { label: '9e', key: 'ninth_prize_percent' },
+                  { label: '10e', key: 'tenth_prize_percent' },
+                ].map((p) => (
+                  <div key={p.key} className="space-y-1">
+                    <label className="text-[10px] font-black text-slate-500 uppercase ml-2">{p.label}</label>
+                    <input
+                      type="number"
+                      step="any"
+                      className="w-full p-3 bg-slate-800 border border-slate-700 rounded-xl text-white font-bold outline-none focus:ring-2 ring-blue-500"
+                      value={(contest as any)[p.key]}
+                      onChange={e => setContest({ ...contest, [p.key]: Number(e.target.value) })}
+                    />
+                  </div>
+                ))}
               </div>
             </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-               <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Statut Inisyal</label>
-               <select className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.status} onChange={e => setContest({...contest, status: e.target.value as any})}>
-                  <option value="pending">AP TANN (Pending)</option>
-                  <option value="active">AKTIF (Live)</option>
-               </select>
+              <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Statut Inisyal</label>
+              <select className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-white font-bold outline-none" value={contest.status} onChange={e => setContest({ ...contest, status: e.target.value as any })}>
+                <option value="pending">AP TANN (Pending)</option>
+                <option value="active">AKTIF (Live)</option>
+              </select>
             </div>
           </div>
 
@@ -504,7 +500,7 @@ const AdminContestManager: React.FC = () => {
                       <div>
                         <div className="font-black text-white text-lg leading-tight">{c.title}</div>
                         <div className="flex gap-2 mt-1 text-[10px]">
-                          <span className="text-yellow-400 font-black uppercase bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">{c.entry_fee_htg} HTG</span>
+                          <span className="text-yellow-400 font-black uppercase bg-yellow-400/10 px-2 py-0.5 rounded border border-yellow-400/20">{c.entry_fee} HTG</span>
                           <span className="text-green-400 font-black uppercase bg-green-400/10 px-2 py-0.5 rounded border border-green-400/20">Pool: {c.grand_prize} HTG</span>
                         </div>
                       </div>
@@ -516,20 +512,20 @@ const AdminContestManager: React.FC = () => {
                     </span>
                   </td>
                   <td className="p-6">
-                     <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${c.status === 'active' ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' : c.status === 'finished' ? 'bg-slate-700 text-slate-400 border-slate-600' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
+                    <span className={`text-[9px] font-black uppercase px-2 py-1 rounded-full border ${c.status === 'active' ? 'bg-red-500/10 text-red-500 border-red-500/20 animate-pulse' : c.status === 'finished' ? 'bg-slate-700 text-slate-400 border-slate-600' : 'bg-blue-500/10 text-blue-500 border-blue-500/20'}`}>
                       {c.status === 'active' ? '🔴 LIVE' : c.status === 'finished' ? 'FINI' : '⏳ PENDING'}
-                     </span>
+                    </span>
                   </td>
                   <td className="p-6 text-right">
                     <div className="flex items-center justify-end gap-2">
-                       {c.status === 'pending' && (
-                         <button onClick={() => updateStatus(c.id, 'active')} className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all">
-                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
-                         </button>
-                       )}
-                       <button onClick={() => setContestToDelete(c.id)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all shadow-sm">
-                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                       </button>
+                      {c.status === 'pending' && (
+                        <button onClick={() => updateStatus(c.id, 'active')} className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
+                        </button>
+                      )}
+                      <button onClick={() => setContestToDelete(c.id)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all shadow-sm">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
                     </div>
                   </td>
                 </tr>

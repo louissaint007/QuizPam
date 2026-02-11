@@ -36,7 +36,7 @@ const App: React.FC = () => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
-  const [gameAnswers, setGameAnswers] = useState<{questionId: string, isCorrect: boolean, timeSpent: number}[]>([]);
+  const [gameAnswers, setGameAnswers] = useState<{ questionId: string, isCorrect: boolean, timeSpent: number }[]>([]);
 
   // Timer reference for ms tracking
   const questionStartTimeRef = useRef<number>(0);
@@ -69,7 +69,7 @@ const App: React.FC = () => {
       if (!currentUser) {
         const { data: created } = await supabase.from('profiles').upsert({
           id: userId,
-          username: currentSession?.user?.user_metadata?.username || `Jwe_${userId.slice(0,4)}`,
+          username: currentSession?.user?.user_metadata?.username || `Jwe_${userId.slice(0, 4)}`,
           balance_htg: 0, solo_level: 1, honorary_title: 'Novice'
         }).select().single();
         currentUser = created;
@@ -83,10 +83,10 @@ const App: React.FC = () => {
     setIsSyncing(true);
     try {
       // 1. Update session with score and total time
-      await supabase.from('game_sessions').update({ 
-        is_completed: true, 
+      await supabase.from('game_sessions').update({
+        is_completed: true,
         score: data.score,
-        total_time_ms: data.total_time_ms 
+        total_time_ms: data.total_time_ms
       }).eq('id', data.sessionId);
 
       // 2. Insert detailed progress
@@ -170,7 +170,7 @@ const App: React.FC = () => {
     setError(null);
     try {
       let selectedIds: string[] = [];
-      
+
       if (mode === 'finalist') {
         // Special final round logic: Get Expert questions
         const { data: expertPool } = await supabase
@@ -198,7 +198,7 @@ const App: React.FC = () => {
       if (sessErr) throw sessErr;
 
       const { data: fullQuestions } = await supabase.from('questions').select('*').in('id', selectedIds);
-      
+
       setQuestions(fullQuestions as Question[]);
       setActiveSessionId(gameSession.id);
       setCurrentIndex(0);
@@ -218,19 +218,19 @@ const App: React.FC = () => {
 
   const handleSelect = (idx: number) => {
     if (isShowingCorrect || gameState !== 'playing') return;
-    
+
     const timeSpent = Date.now() - questionStartTimeRef.current;
     const isTimeout = idx === -1;
     const currentQ = questions[currentIndex];
     const isCorrect = !isTimeout && idx === currentQ.correct_index;
-    
+
     setSelectedAnswer(idx);
     if (!isTimeout) setIsShowingCorrect(true);
 
     const points = isCorrect ? (100 + Math.floor(timeLeft * 10)) : 0;
     const newScore = score + points;
     const newTotalTime = totalTimeMs + timeSpent;
-    
+
     if (isCorrect) setScore(newScore);
     setTotalTimeMs(newTotalTime);
 
@@ -331,27 +331,28 @@ const App: React.FC = () => {
 
       {isMobileMenuOpen && (
         <div className="fixed inset-0 z-[60] bg-slate-900 md:hidden flex flex-col p-8 animate-in slide-in-from-right duration-300">
-           <div className="flex justify-between items-center mb-12">
-             <span className="text-2xl font-black italic"><span className="text-red-500">Quiz</span>Pam</span>
-             <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-800 rounded-xl">
-               <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></button>
-           </div>
-           <div className="space-y-4 flex-1 overflow-y-auto">
-             <button onClick={() => { setView('home'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Lobby <span>🏠</span></button>
-             {user && (
-               <>
-                 <button onClick={() => { setView('profile'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Profil & Depo <span>💰</span></button>
-                 {user.is_admin && <button onClick={() => { setView('admin'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Admin <span>🛡️</span></button>}
-               </>
-             )}
-           </div>
-           <div className="pt-8 border-t border-white/5 mt-auto">
-             {user ? (
-               <button onClick={handleLogout} className="w-full py-5 bg-red-500/10 text-red-500 font-black rounded-3xl uppercase tracking-widest text-xs border border-red-500/20">Dekonekte</button>
-             ) : (
-               <button onClick={() => { setView('auth'); setIsMobileMenuOpen(false); }} className="w-full py-5 bg-blue-600 text-white font-black rounded-3xl uppercase tracking-widest text-xs">Koneksyon</button>
-             )}
-           </div>
+          <div className="flex justify-between items-center mb-12">
+            <span className="text-2xl font-black italic"><span className="text-red-500">Quiz</span>Pam</span>
+            <button onClick={() => setIsMobileMenuOpen(false)} className="p-2 bg-slate-800 rounded-xl">
+              <svg className="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg>
+            </button>
+          </div>
+          <div className="space-y-4 flex-1 overflow-y-auto">
+            <button onClick={() => { setView('home'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Lobby <span>🏠</span></button>
+            {user && (
+              <>
+                <button onClick={() => { setView('profile'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Profil & Depo <span>💰</span></button>
+                {user.is_admin && <button onClick={() => { setView('admin'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Admin <span>🛡️</span></button>}
+              </>
+            )}
+          </div>
+          <div className="pt-8 border-t border-white/5 mt-auto">
+            {user ? (
+              <button onClick={handleLogout} className="w-full py-5 bg-red-500/10 text-red-500 font-black rounded-3xl uppercase tracking-widest text-xs border border-red-500/20">Dekonekte</button>
+            ) : (
+              <button onClick={() => { setView('auth'); setIsMobileMenuOpen(false); }} className="w-full py-5 bg-blue-600 text-white font-black rounded-3xl uppercase tracking-widest text-xs">Koneksyon</button>
+            )}
+          </div>
         </div>
       )}
 
@@ -361,7 +362,7 @@ const App: React.FC = () => {
         {view === 'auth' && <Auth onAuthComplete={() => setView('home')} />}
         {view === 'profile' && user && <ProfileView user={user} wallet={wallet} onBack={() => setView('home')} onDeposit={() => redirectToMonCash(500, 'deposit')} />}
         {view === 'contest-detail' && selectedContest && (
-          <ContestDetailView contest={selectedContest} userBalance={wallet?.total_balance || 0} onBack={() => setView('home')} onJoin={() => redirectToMonCash(selectedContest.entry_fee_htg, 'contest_entry', selectedContest.id)} />
+          <ContestDetailView contest={selectedContest} userBalance={wallet?.total_balance || 0} onBack={() => setView('home')} onJoin={() => redirectToMonCash(selectedContest.entry_fee, 'contest_entry', selectedContest.id)} />
         )}
         {view === 'finalist-arena' && selectedContest && (
           <FinalistArena contestTitle={selectedContest.title} onStartFinal={() => startGame('finalist')} />
@@ -373,7 +374,7 @@ const App: React.FC = () => {
               <h1 className="text-5xl md:text-7xl font-black text-white tracking-tighter uppercase mb-4">Lobby <span className="text-red-500">Jwèt Yo</span></h1>
               <p className="text-lg text-slate-400 max-w-md mx-auto">Chwazi yon konkou oswa antrene tèt ou an Solo.</p>
             </div>
-            
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
               <div className="bg-slate-800/40 rounded-[2.5rem] border-2 border-dashed border-slate-700 p-8 flex flex-col justify-between group hover:border-blue-500/50 cursor-pointer transition-all" onClick={() => startGame('solo')}>
                 <div className="space-y-4">
@@ -386,16 +387,16 @@ const App: React.FC = () => {
 
               {contests.map(c => (
                 <div key={c.id} className="bg-slate-800 rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col group hover:scale-[1.02] transition-all shadow-2xl">
-                   <div className="h-48 bg-slate-700 bg-cover bg-center flex items-end p-6" style={c.image_url ? { backgroundImage: `linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.98)), url(${c.image_url})` } : {}}>
-                      <h4 className="text-xl font-black text-white truncate">{c.title}</h4>
-                   </div>
-                   <div className="p-6 space-y-4">
-                      <div className="flex justify-between">
-                         <span className="text-yellow-400 font-black">{c.entry_fee_htg} HTG</span>
-                         <span className="text-green-400 font-black">Pool: {c.grand_prize} HTG</span>
-                      </div>
-                      <button onClick={() => { setSelectedContest(c); setView('contest-detail'); }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-blue-500 transition-colors">Patisipe</button>
-                   </div>
+                  <div className="h-48 bg-slate-700 bg-cover bg-center flex items-end p-6" style={c.image_url ? { backgroundImage: `linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.98)), url(${c.image_url})` } : {}}>
+                    <h4 className="text-xl font-black text-white truncate">{c.title}</h4>
+                  </div>
+                  <div className="p-6 space-y-4">
+                    <div className="flex justify-between">
+                      <span className="text-yellow-400 font-black">{c.entry_fee} HTG</span>
+                      <span className="text-green-400 font-black">Pool: {c.grand_prize} HTG</span>
+                    </div>
+                    <button onClick={() => { setSelectedContest(c); setView('contest-detail'); }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-blue-500 transition-colors">Patisipe</button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -405,24 +406,24 @@ const App: React.FC = () => {
         {gameState === 'playing' && questions[currentIndex] && (
           <div className="max-w-3xl mx-auto pt-8 animate-in fade-in zoom-in">
             <div className="flex justify-between items-center mb-6 px-4">
-               <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Kesyon {currentIndex + 1} / {questions.length}</span>
-               <div className="text-right">
-                  <span className="text-xl font-black text-blue-400 block">{score} PTS</span>
-                  <span className="text-[9px] text-slate-500 font-bold">⏱️ {(totalTimeMs / 1000).toFixed(2)}s</span>
-               </div>
+              <span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Kesyon {currentIndex + 1} / {questions.length}</span>
+              <div className="text-right">
+                <span className="text-xl font-black text-blue-400 block">{score} PTS</span>
+                <span className="text-[9px] text-slate-500 font-bold">⏱️ {(totalTimeMs / 1000).toFixed(2)}s</span>
+              </div>
             </div>
-            <QuizCard 
-              question={questions[currentIndex]} 
-              onSelect={handleSelect} 
-              selectedId={selectedAnswer} 
-              showCorrect={isShowingCorrect} 
+            <QuizCard
+              question={questions[currentIndex]}
+              onSelect={handleSelect}
+              selectedId={selectedAnswer}
+              showCorrect={isShowingCorrect}
             />
             {!isShowingCorrect && (
-              <GameTimer 
-                duration={10} 
-                onTimeUp={() => handleSelect(-1)} 
-                isActive={gameState === 'playing' && !isShowingCorrect} 
-                onTick={setTimeLeft} 
+              <GameTimer
+                duration={10}
+                onTimeUp={() => handleSelect(-1)}
+                isActive={gameState === 'playing' && !isShowingCorrect}
+                onTick={setTimeLeft}
               />
             )}
           </div>
@@ -433,25 +434,25 @@ const App: React.FC = () => {
             <div className="w-32 h-32 bg-yellow-500/20 rounded-full flex items-center justify-center mx-auto text-6xl mb-4 shadow-2xl">🏆</div>
             <h2 className="text-6xl md:text-8xl font-black text-white mb-2 tracking-tighter uppercase">Nòt: {score}</h2>
             <div className="space-y-1">
-              <p className="text-slate-400 font-bold uppercase tracking-[0.4em]">Tan Total: {(totalTimeMs/1000).toFixed(2)}s</p>
+              <p className="text-slate-400 font-bold uppercase tracking-[0.4em]">Tan Total: {(totalTimeMs / 1000).toFixed(2)}s</p>
               <p className="text-[10px] text-slate-500">Règ: Score segon nan egalitarian se Tan ki depataje.</p>
             </div>
             <div className="pt-8">
-               <button onClick={() => { setView('home'); setGameState('ready'); }} className="bg-blue-600 text-white px-16 py-5 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-xl active:translate-y-2 transition-all hover:bg-blue-500">Tounen Lobby</button>
+              <button onClick={() => { setView('home'); setGameState('ready'); }} className="bg-blue-600 text-white px-16 py-5 rounded-[2.5rem] font-black uppercase tracking-widest text-xs shadow-xl active:translate-y-2 transition-all hover:bg-blue-500">Tounen Lobby</button>
             </div>
           </div>
         )}
 
         {view === 'admin' && user?.is_admin && (
           <div className="space-y-8 animate-in fade-in duration-500">
-             <div className="flex gap-4 border-b border-white/5 pb-4 overflow-x-auto">
-                <button onClick={() => setAdminTab('stats')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'stats' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Stats</button>
-                <button onClick={() => setAdminTab('questions')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'questions' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Kesyon</button>
-                <button onClick={() => setAdminTab('contests')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'contests' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Konkou</button>
-             </div>
-             {adminTab === 'stats' && <AdminStats />}
-             {adminTab === 'questions' && <AdminQuestionManager />}
-             {adminTab === 'contests' && <AdminContestManager />}
+            <div className="flex gap-4 border-b border-white/5 pb-4 overflow-x-auto">
+              <button onClick={() => setAdminTab('stats')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'stats' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Stats</button>
+              <button onClick={() => setAdminTab('questions')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'questions' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Kesyon</button>
+              <button onClick={() => setAdminTab('contests')} className={`px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${adminTab === 'contests' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-slate-800 text-slate-500 hover:text-white'}`}>Konkou</button>
+            </div>
+            {adminTab === 'stats' && <AdminStats />}
+            {adminTab === 'questions' && <AdminQuestionManager />}
+            {adminTab === 'contests' && <AdminContestManager />}
           </div>
         )}
       </main>

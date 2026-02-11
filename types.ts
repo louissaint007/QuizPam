@@ -61,11 +61,14 @@ export interface Contest {
   id: string;
   title: string;
   category_filter?: string;
-  entry_fee_htg: number;
+  entry_fee: number;
   min_participants: number;
   current_participants: number;
-  status: 'pending' | 'active' | 'finished';
+  status: 'pending' | 'active' | 'finished' | 'scheduled';
   grand_prize?: number;
+  total_prize_pool?: number;
+  winners_count?: number;
+  difficulty_filter?: number;
   image_url?: string;
   admin_margin_percent: number;
   first_prize_percent?: number;
