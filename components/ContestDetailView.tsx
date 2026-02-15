@@ -12,7 +12,11 @@ interface ContestDetailViewProps {
 const ContestDetailView: React.FC<ContestDetailViewProps> = ({ contest, userBalance, onBack, onJoin }) => {
   const prizePool = contest.grand_prize || 0;
   const entryFee = contest.entry_fee || 0;
+  
+  const isLive = contest.status === 'active';
   const canAfford = userBalance >= entryFee;
+  // Si c'est live, on ne peut pas rejoindre, peu importe le solde.
+  const canJoin = !isLive && canAfford;
 
   // Calculer un "Pousantaj Preferans" fictif basé sur le remplissage pour le marketing
   const preferencePercent = Math.min(99, Math.floor(((contest.current_participants || 0) / (contest.min_participants || 1)) * 100) + 12);
@@ -48,8 +52,8 @@ const ContestDetailView: React.FC<ContestDetailViewProps> = ({ contest, userBala
           {!contest.image_url && <div className="absolute inset-0 flex items-center justify-center text-9xl opacity-5">🏆</div>}
           <div className="absolute bottom-10 left-10 right-10">
             <div className="flex items-center gap-3 mb-4">
-              <span className="bg-red-600 px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg animate-pulse">
-                {contest.status === 'active' ? 'AN KOU KOUNYE A' : 'AP TANN JWÈ'}
+              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-white shadow-lg animate-pulse ${isLive ? 'bg-red-600' : 'bg-blue-600'}`}>
+                {isLive ? 'AN KOU (LIVE)' : 'AP TANN JWÈ'}
               </span>
               <span className="bg-slate-900/80 backdrop-blur-md px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest text-slate-300 border border-white/10">
                 {contest.category_filter || 'TOUT KATEGORI'}
@@ -79,7 +83,6 @@ const ContestDetailView: React.FC<ContestDetailViewProps> = ({ contest, userBala
                   </div>
                   <div className="text-right">
                     <div className="text-xl font-black text-white">{(prizePool * (p.percent || 0) / 100).toLocaleString()} HTG</div>
-                    {/* Le pourcentage a été enlevé ici selon la demande */}
                   </div>
                 </div>
               ))}
@@ -132,25 +135,28 @@ const ContestDetailView: React.FC<ContestDetailViewProps> = ({ contest, userBala
                 <span className="text-[10px] font-black text-slate-500 uppercase">Preferans</span>
                 <span className="text-sm font-black text-white">{preferencePercent}%</span>
               </div>
-              {/* Marge Admin a te kache selon demann ou an */}
             </div>
 
-            {!canAfford && (
+            {isLive ? (
+               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl mb-4 text-center">
+                <p className="text-[10px] font-black text-red-500 uppercase leading-relaxed">Konkou a deja kòmanse (LIVE). Enskripsyon fèmen.</p>
+               </div>
+            ) : !canAfford ? (
               <div className="p-4 bg-red-500/10 border border-red-500/20 rounded-2xl mb-4 text-center">
                 <p className="text-[10px] font-black text-red-500 uppercase leading-relaxed">Ou pa gen ase kòb sou balans ou pou patisipe.</p>
               </div>
-            )}
+            ) : null}
 
             <button
               onClick={() => onJoin(contest.id)}
-              disabled={!canAfford}
-              className={`w-full py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest transition-all shadow-xl flex flex-col items-center justify-center gap-1 ${canAfford
+              disabled={!canJoin}
+              className={`w-full py-6 rounded-[2rem] font-black uppercase text-xs tracking-widest transition-all shadow-xl flex flex-col items-center justify-center gap-1 ${canJoin
                   ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-[0_8px_0_rgb(29,78,216)] active:translate-y-2 active:shadow-none'
                   : 'bg-slate-700 text-slate-500 cursor-not-allowed opacity-50'
                 }`}
             >
-              <span>KONFIME PATISIPASYON</span>
-              <span className="text-[8px] opacity-60 font-bold">Lajan an ap dedwi otomatikman</span>
+              <span>{isLive ? "ENSKRIPSYON FÈMEN (LIVE)" : "KONFIME PATISIPASYON"}</span>
+              {!isLive && <span className="text-[8px] opacity-60 font-bold">Lajan an ap dedwi otomatikman</span>}
             </button>
 
             <div className="mt-6 flex items-center justify-center gap-2">

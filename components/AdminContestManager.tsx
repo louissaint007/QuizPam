@@ -22,7 +22,7 @@ const AdminContestManager: React.FC = () => {
 
   const [contest, setContest] = useState({
     title: '',
-    entry_fee_htg: 250,
+    entry_fee: 250,
     min_participants: 100,
     admin_margin_percent: 50,
     grand_prize: 0,
@@ -163,7 +163,7 @@ const AdminContestManager: React.FC = () => {
 
       const contestToInsert = {
         title: contest.title.trim(),
-        entry_fee_htg: Number(contest.entry_fee_htg),
+        entry_fee: Number(contest.entry_fee),
         min_participants: Number(contest.min_participants),
         admin_margin_percent: Number(contest.admin_margin_percent),
         grand_prize: Number(contest.grand_prize),
@@ -194,7 +194,7 @@ const AdminContestManager: React.FC = () => {
       // Reset form
       setContest({
         title: '',
-        entry_fee_htg: 250,
+        entry_fee: 250,
         min_participants: 100,
         admin_margin_percent: 50,
         grand_prize: 0,
@@ -366,7 +366,7 @@ const AdminContestManager: React.FC = () => {
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Frè (HTG)</label>
-                <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-yellow-400 font-black outline-none focus:ring-2 ring-yellow-400" value={contest.entry_fee_htg} onChange={e => setContest({ ...contest, entry_fee_htg: Number(e.target.value) })} />
+                <input type="number" step="any" className="w-full p-4 bg-slate-800 border border-slate-700 rounded-2xl text-yellow-400 font-black outline-none focus:ring-2 ring-yellow-400" value={contest.entry_fee} onChange={e => setContest({ ...contest, entry_fee: Number(e.target.value) })} />
               </div>
               <div className="space-y-1">
                 <label className="text-[10px] font-black text-slate-500 uppercase ml-2">Min. Jwè</label>
@@ -518,18 +518,34 @@ const AdminContestManager: React.FC = () => {
                   </td>
                   <td className="p-6 text-right">
                     <div className="flex items-center justify-end gap-2">
+                      {/* BOUTON POU CHANTE STATI */}
                       {c.status === 'pending' && (
-                        <button onClick={() => updateStatus(c.id, 'active')} className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all">
+                        <button 
+                          onClick={() => updateStatus(c.id, 'active')} 
+                          className="p-2 bg-green-500/10 text-green-500 hover:bg-green-500 hover:text-white rounded-lg transition-all border border-green-500/20"
+                          title="Mete Live"
+                        >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" /></svg>
                         </button>
                       )}
+                      
+                      {c.status === 'active' && (
+                        <button 
+                          onClick={() => updateStatus(c.id, 'pending')} 
+                          className="p-2 bg-yellow-500/10 text-yellow-500 hover:bg-yellow-500 hover:text-white rounded-lg transition-all border border-yellow-500/20"
+                          title="Remèt Pending (Pause)"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        </button>
+                      )}
+
                       <button onClick={() => setContestToDelete(c.id)} className="p-2 bg-red-500/10 text-red-500 hover:bg-red-500 hover:text-white rounded-lg transition-all shadow-sm">
                         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              ))} 
             </tbody>
           </table>
         </div>
