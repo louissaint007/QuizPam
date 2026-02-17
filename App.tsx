@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { UserProfile, Question, Contest, Wallet, SoloSyncData } from './types';
+import { UserProfile, Question, Contest, Wallet, Transaction, SoloSyncData } from './types';
 import QuizCard from './components/QuizCard';
 import GameTimer from './components/GameTimer';
 import AdminQuestionManager from './components/AdminQuestionManager';
@@ -9,17 +9,22 @@ import AdminContestManager from './components/AdminContestManager';
 import Auth from './components/Auth';
 import ProfileView from './components/ProfileView';
 import ContestDetailView from './components/ContestDetailView';
+import JoinedContestsView from './components/JoinedContestsView';
 import FinalistArena from './components/FinalistArena';
+import Reviews from './components/Reviews';
 import { supabase, isSupabaseConfigured } from './lib/supabase';
+import { calculateQuestionXp, calculateLevel, getLevelTitle, getPrestigeStyle } from './utils/xp';
 
 const MONCASH_GATEWAY_URL = 'https://page-moncash-quiz-pam.vercel.app/';
 
 const App: React.FC = () => {
   const [session, setSession] = useState<any>(null);
-  const [view, setView] = useState<'home' | 'solo' | 'contest' | 'admin' | 'auth' | 'profile' | 'contest-detail' | 'finalist-arena'>('home');
+  const [view, setView] = useState<'landing' | 'home' | 'solo' | 'contest' | 'admin' | 'auth' | 'profile' | 'contest-detail' | 'finalist-arena' | 'reviews' | 'my-contests'>('landing');
   const [adminTab, setAdminTab] = useState<'stats' | 'questions' | 'contests'>('stats');
   const [user, setUser] = useState<UserProfile | null>(null);
   const [wallet, setWallet] = useState<Wallet | null>(null);
+  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [joinedContests, setJoinedContests] = useState<string[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [contests, setContests] = useState<Contest[]>([]);
   const [selectedContest, setSelectedContest] = useState<Contest | null>(null);
@@ -37,6 +42,8 @@ const App: React.FC = () => {
   const [hasPendingSync, setHasPendingSync] = useState(false);
   const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
   const [gameAnswers, setGameAnswers] = useState<{ questionId: string, isCorrect: boolean, timeSpent: number }[]>([]);
+  const [fraudWarnings, setFraudWarnings] = useState(0);
+  const [selectedPrizeImage, setSelectedPrizeImage] = useState<string | null>(null);
 
   // Timer reference for ms tracking
   const questionStartTimeRef = useRef<number>(0);
@@ -59,24 +66,62 @@ const App: React.FC = () => {
 
   const fetchUserAndWallet = async (userId: string, currentSession: any) => {
     try {
-      const [profileRes, walletRes] = await Promise.all([
+      const [profileRes, walletRes, transRes, joinedRes] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('wallets').select('*').eq('user_id', userId).maybeSingle()
+        supabase.from('wallets').select('*').eq('user_id', userId).maybeSingle(),
+        supabase.from('transactions').select('*').eq('user_id', userId).order('created_at', { ascending: false }).limit(20),
+        supabase.from('contest_participants').select('contest_id').eq('user_id', userId)
       ]);
-      if (profileRes.error) throw profileRes.error;
+
       const userEmail = currentSession?.user?.email;
       let currentUser = profileRes.data;
-      if (!currentUser) {
-        const { data: created } = await supabase.from('profiles').upsert({
+
+      // Robust creation if missing
+      if (!currentUser && userId) {
+        console.log("[INIT] Profile missing, attempting creation for:", userId);
+        const { data: created, error: createError } = await supabase.from('profiles').upsert({
           id: userId,
           username: currentSession?.user?.user_metadata?.username || `Jwe_${userId.slice(0, 4)}`,
-          balance_htg: 0, solo_level: 1, honorary_title: 'Novice'
+          balance_htg: 0,
+          level: 1,
+          xp: 0,
+          honorary_title: 'Novice',
+          last_level_notified: 1
         }).select().single();
-        currentUser = created;
+
+        if (createError) {
+          console.error("[INIT] Profile creation error:", createError);
+          // Try a simple select one last time in case of race condition
+          const { data: retry } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle();
+          currentUser = retry;
+        } else {
+          currentUser = created;
+        }
       }
-      setUser({ ...currentUser, email: userEmail } as UserProfile);
-      if (walletRes.data) setWallet(walletRes.data as Wallet);
-    } catch (err) { console.error(err); }
+
+      if (currentUser) {
+        setUser({ ...currentUser, email: userEmail } as UserProfile);
+      } else {
+        console.error("[INIT] Could not resolve user profile for:", userId);
+      }
+
+      // If wallet is missing, create it
+      if (!walletRes.data && userId) {
+        const { data: newWallet } = await supabase.from('wallets').upsert({
+          user_id: userId,
+          total_balance: 0,
+          total_deposited: 0,
+          total_withdrawn: 0,
+          total_won: 0
+        }).select().single();
+        if (newWallet) setWallet(newWallet as Wallet);
+      } else {
+        setWallet(walletRes.data as Wallet);
+      }
+
+      if (transRes.data) setTransactions(transRes.data as Transaction[]);
+      if (joinedRes.data) setJoinedContests(joinedRes.data.map((p: any) => p.contest_id));
+    } catch (err) { }
   };
 
   const uploadResults = async (data: SoloSyncData) => {
@@ -89,7 +134,60 @@ const App: React.FC = () => {
         total_time_ms: data.total_time_ms
       }).eq('id', data.sessionId);
 
-      // 2. Insert detailed progress
+      // 2. Update User XP and Level
+      // Fetch seen questions to detect farming BEFORE inserting new ones
+      const { data: seenQuestions } = await supabase
+        .from('user_solo_progress')
+        .select('question_id')
+        .eq('user_id', data.userId)
+        .eq('is_correct', true)
+        .in('question_id', data.answers.map(a => a.questionId));
+
+      const seenIds = new Set(seenQuestions?.map(q => q.question_id) || []);
+
+      let totalXpGained = 0;
+      data.answers.forEach(ans => {
+        if (ans.isCorrect) {
+          const isRepeated = seenIds.has(ans.questionId);
+          // Time left: Each question has 10s. timeLeft = 10 - (timeSpent/1000)
+          const timeLeft = Math.max(0, 10 - (ans.timeSpent / 1000));
+          totalXpGained += calculateQuestionXp(true, timeLeft, isRepeated);
+        }
+      });
+
+      if (totalXpGained > 0 && user) {
+        const newTotalXp = Number(user.xp || 0) + totalXpGained;
+        const newLevel = calculateLevel(newTotalXp);
+
+        let newTitle = user.honorary_title;
+        if (newLevel !== user.level) {
+          const { data: config } = await supabase
+            .from('levels_config')
+            .select('title')
+            .lte('level', newLevel)
+            .order('level', { ascending: false })
+            .limit(1)
+            .single();
+          if (config) newTitle = config.title;
+        }
+
+        const { data: updatedProfile } = await supabase
+          .from('profiles')
+          .update({
+            xp: newTotalXp,
+            level: newLevel,
+            honorary_title: newTitle
+          })
+          .eq('id', data.userId)
+          .select()
+          .single();
+
+        if (updatedProfile) {
+          setUser({ ...updatedProfile, email: user.email } as UserProfile);
+        }
+      }
+
+      // 3. Insert detailed progress
       const progressData = data.answers.map(ans => ({
         user_id: data.userId,
         question_id: ans.questionId,
@@ -97,8 +195,7 @@ const App: React.FC = () => {
       }));
       await supabase.from('user_solo_progress').insert(progressData);
 
-      // 3. Logic: Check for perfect ties and mark as finalist if applicable
-      // This is a simplified client-side check. In production, a Supabase Function would be better.
+      // 4. Logic: Check for perfect ties and mark as finalist if applicable
       const { data: competitors } = await supabase
         .from('game_sessions')
         .select('id, score, total_time_ms')
@@ -123,6 +220,64 @@ const App: React.FC = () => {
       return false;
     } finally {
       setIsSyncing(false);
+    }
+  };
+
+  const handleJoinContest = async (contest: Contest) => {
+    if (!user || !wallet) { setView('auth'); return; }
+
+    // Check if already joined
+    if (joinedContests.includes(contest.id)) {
+      setError("Ou deja enskri nan konkou sa a!");
+      setView('my-contests');
+      return;
+    }
+
+    // Check if contest has ended
+    if (contest.ends_at && new Date(contest.ends_at) < new Date()) {
+      setError("Konkou sa a fini deja!");
+      return;
+    }
+
+    const entryFee = contest.entry_fee || contest.entry_fee_htg || 0;
+
+    // 1. Check if user has enough money (use profile balance as single source of truth)
+    if ((user.balance_htg || 0) >= entryFee) {
+      setIsLoading(true);
+      try {
+        // Create a completed transaction for the entry fee
+        const { error: txError } = await supabase.from('transactions').insert({
+          user_id: user.id,
+          amount: entryFee,
+          type: 'entry_fee',
+          status: 'completed',
+          description: `Peyiman Konkou: ${contest.title}`,
+          reference_id: contest.id,
+          payment_method: 'WALLET'
+        });
+
+        if (txError) throw txError;
+
+        // 2. Register participation
+        const { error: partError } = await supabase.from('contest_participants').insert({
+          contest_id: contest.id,
+          user_id: user.id,
+          status: 'joined'
+        });
+
+        if (partError) throw partError;
+
+        await fetchUserAndWallet(user.id, session);
+        setError(null);
+        setView('my-contests');
+      } catch (err: any) {
+        setError("Erè pandan n ap dedui kòb la: " + err.message);
+      } finally {
+        setIsLoading(false);
+      }
+    } else {
+      setError(`Ou pa gen ase kòb sou balans ou (${user.balance_htg || 0} HTG). Konkou sa a koute ${entryFee} HTG. Tanpri fè yon depo.`);
+      setView('profile');
     }
   };
 
@@ -302,13 +457,15 @@ const App: React.FC = () => {
                 </div>
                 <div className="text-right">
                   <p className="hidden xs:block text-[8px] md:text-[10px] font-black text-slate-500 uppercase tracking-widest leading-none">Balans</p>
-                  <p className="text-yellow-400 font-black text-xs md:text-sm">{(wallet?.total_balance || 0).toLocaleString()} <span className="text-[10px]">HTG</span></p>
+                  <p className="text-yellow-400 font-black text-xs md:text-sm">{(user?.balance_htg || 0).toLocaleString()} <span className="text-[10px]">HTG</span></p>
                 </div>
               </button>
             )}
 
             {session && user && (
               <div className="hidden md:flex items-center space-x-4">
+                <button onClick={() => setView('my-contests')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Konkou Mwen</button>
+                <button onClick={() => setView('reviews')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Avis</button>
                 {user.is_admin && (
                   <button onClick={() => setView('admin')} className="text-[10px] font-black uppercase tracking-widest bg-slate-700 hover:bg-slate-600 px-4 py-2.5 rounded-xl transition-colors">Admin</button>
                 )}
@@ -319,7 +476,11 @@ const App: React.FC = () => {
             )}
 
             {!session && (
-              <button onClick={() => setView('auth')} className="hidden md:block text-[10px] font-black uppercase tracking-widest bg-blue-600 px-6 py-2.5 rounded-xl shadow-lg hover:bg-blue-500 transition-all">Koneksyon</button>
+              <div className="hidden md:flex items-center space-x-4">
+                <button onClick={() => setView('my-contests')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Konkou Mwen</button>
+                <button onClick={() => setView('reviews')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-white transition-colors">Avis</button>
+                <button onClick={() => setView('auth')} className="text-[10px] font-black uppercase tracking-widest bg-blue-600 px-6 py-2.5 rounded-xl shadow-lg hover:bg-blue-500 transition-all">Koneksyon</button>
+              </div>
             )}
 
             <button onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)} className="md:hidden p-2 text-white bg-slate-800 rounded-xl">
@@ -338,7 +499,10 @@ const App: React.FC = () => {
             </button>
           </div>
           <div className="space-y-4 flex-1 overflow-y-auto">
+            <button onClick={() => { setView('landing'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Landing <span>🌐</span></button>
             <button onClick={() => { setView('home'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Lobby <span>🏠</span></button>
+            <button onClick={() => { setView('my-contests'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Konkou Mwen <span>🏆</span></button>
+            <button onClick={() => { setView('reviews'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Avis Kliyan <span>💬</span></button>
             {user && (
               <>
                 <button onClick={() => { setView('profile'); setIsMobileMenuOpen(false); }} className="w-full text-left p-6 bg-slate-800 rounded-3xl font-black uppercase tracking-widest text-sm flex items-center justify-between">Profil & Depo <span>💰</span></button>
@@ -360,12 +524,116 @@ const App: React.FC = () => {
         {error && <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl mb-6 font-bold text-center uppercase text-xs">{error}</div>}
 
         {view === 'auth' && <Auth onAuthComplete={() => setView('home')} />}
-        {view === 'profile' && user && <ProfileView user={user} wallet={wallet} onBack={() => setView('home')} onDeposit={() => redirectToMonCash(500, 'deposit')} />}
+        {view === 'profile' && user && (
+          <ProfileView
+            user={user}
+            wallet={wallet}
+            transactions={transactions}
+            onBack={async () => {
+              if (user.level > (user.last_level_notified || 1)) {
+                await supabase.from('profiles').update({ last_level_notified: user.level }).eq('id', user.id);
+                setUser(prev => prev ? { ...prev, last_level_notified: user.level } : null);
+              }
+              setView('home');
+            }}
+            onDeposit={(amount) => redirectToMonCash(amount, 'deposit')}
+          />
+        )}
         {view === 'contest-detail' && selectedContest && (
-          <ContestDetailView contest={selectedContest} userBalance={wallet?.total_balance || 0} onBack={() => setView('home')} onJoin={() => redirectToMonCash(selectedContest.entry_fee, 'contest_entry', selectedContest.id)} />
+          <ContestDetailView
+            contest={selectedContest}
+            userBalance={user?.balance_htg || 0}
+            isJoined={joinedContests.includes(selectedContest.id)}
+            onBack={() => setView('home')}
+            onJoin={() => handleJoinContest(selectedContest)}
+            onGoToMyContests={() => setView('my-contests')}
+            onPrizeClick={(url) => setSelectedPrizeImage(url)}
+          />
         )}
         {view === 'finalist-arena' && selectedContest && (
           <FinalistArena contestTitle={selectedContest.title} onStartFinal={() => startGame('finalist')} />
+        )}
+
+        {view === 'landing' && (
+          <div className="space-y-24 py-12">
+            {/* Hero Section */}
+            <div className="flex flex-col md:flex-row items-center gap-12 animate-in fade-in slide-in-from-bottom duration-700">
+              <div className="flex-1 space-y-8 text-center md:text-left">
+                <div className="inline-block px-4 py-2 bg-red-500/10 border border-red-500/20 rounded-full">
+                  <span className="text-red-500 font-black uppercase text-[10px] tracking-[0.2em]">Pati #1 Ayiti a</span>
+                </div>
+                <h1 className="text-6xl md:text-8xl font-black text-white tracking-tighter leading-none">
+                  DEFIYE <br />
+                  <span className="text-red-500">TÈT OU.</span> <br />
+                  GENYEN.
+                </h1>
+                <p className="text-xl text-slate-400 max-w-lg">
+                  QuizPam se premye platfòm kilti jeneral an Ayiti ki pèmèt ou teste konesans ou, defiye zanmi w, epi genyen prim an lajan kach.
+                </p>
+                <div className="flex flex-col sm:flex-row gap-4 pt-4">
+                  <button onClick={() => setView('home')} className="px-10 py-5 bg-blue-600 hover:bg-blue-500 text-white font-black rounded-2xl uppercase text-xs tracking-widest shadow-2xl shadow-blue-600/20 transition-all active:scale-95">ANTRE NAN JWÈT LA</button>
+                  <button onClick={() => startGame('solo')} className="px-10 py-5 bg-slate-800 hover:bg-slate-700 text-white font-black rounded-2xl uppercase text-xs tracking-widest border border-white/5 transition-all active:scale-95">PRATIK SOLO</button>
+                </div>
+              </div>
+              <div className="flex-1 relative">
+                <div className="absolute -inset-10 bg-blue-600/20 blur-[100px] rounded-full"></div>
+                <div className="relative bg-slate-800 rounded-[3rem] p-4 border border-white/10 shadow-2xl rotate-3 hover:rotate-0 transition-transform duration-500">
+                  <div className="bg-slate-900 rounded-[2.5rem] overflow-hidden">
+                    <div className="p-8 space-y-6">
+                      <div className="flex justify-between items-center">
+                        <div className="w-12 h-12 bg-yellow-500/10 rounded-xl flex items-center justify-center text-2xl">🏆</div>
+                        <span className="text-yellow-500 font-black">TOP JWÈ</span>
+                      </div>
+                      <div className="space-y-4">
+                        {[1, 2, 3].map(i => (
+                          <div key={i} className="flex items-center gap-4 bg-slate-800/50 p-4 rounded-2xl border border-white/5">
+                            <div className="w-10 h-10 rounded-full bg-slate-700"></div>
+                            <div className="flex-1 h-2 bg-slate-700 rounded-full"></div>
+                            <div className="w-12 h-2 bg-blue-500 rounded-full"></div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Features Section */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <div className="bg-slate-800/40 p-10 rounded-[2.5rem] border border-white/5 space-y-4 hover:border-blue-500/30 transition-colors">
+                <div className="text-4xl">⚡</div>
+                <h3 className="text-2xl font-black text-white">Rapidite</h3>
+                <p className="text-slate-400">Plis ou reponn vit, plis ou fè pwen. Chak milisegonn konte!</p>
+              </div>
+              <div className="bg-slate-800/40 p-10 rounded-[2.5rem] border border-white/5 space-y-4 hover:border-red-500/30 transition-colors">
+                <div className="text-4xl">💰</div>
+                <h3 className="text-2xl font-black text-white">Prim</h3>
+                <p className="text-slate-400">Patisipe nan konkou epi retire kòb ou dirèkteman sou MonCash.</p>
+              </div>
+              <div className="bg-slate-800/40 p-10 rounded-[2.5rem] border border-white/5 space-y-4 hover:border-yellow-500/30 transition-colors">
+                <div className="text-4xl">📚</div>
+                <h3 className="text-2xl font-black text-white">Konesans</h3>
+                <p className="text-slate-400">Dè milye de kesyon sou kilti Ayisyen ak mond lan an jeneral.</p>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {view === 'my-contests' && (
+          <JoinedContestsView
+            contests={contests}
+            joinedIds={joinedContests}
+            onBack={() => setView('home')}
+            onEnterContest={(c) => {
+              setSelectedContest(c);
+              startGame('contest');
+            }}
+          />
+        )}
+
+        {view === 'reviews' && (
+          <Reviews user={user} />
         )}
 
         {view === 'home' && (
@@ -385,20 +653,53 @@ const App: React.FC = () => {
                 <button className="mt-8 w-full py-4 bg-slate-700 group-hover:bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest transition-all">KÒMANSE SOLO</button>
               </div>
 
-              {contests.map(c => (
-                <div key={c.id} className="bg-slate-800 rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col group hover:scale-[1.02] transition-all shadow-2xl">
-                  <div className="h-48 bg-slate-700 bg-cover bg-center flex items-end p-6" style={c.image_url ? { backgroundImage: `linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.98)), url(${c.image_url})` } : {}}>
-                    <h4 className="text-xl font-black text-white truncate">{c.title}</h4>
-                  </div>
-                  <div className="p-6 space-y-4">
-                    <div className="flex justify-between">
-                      <span className="text-yellow-400 font-black">{c.entry_fee} HTG</span>
-                      <span className="text-green-400 font-black">Pool: {c.grand_prize} HTG</span>
+              {contests.map(c => {
+                const progress = Math.min(100, ((c.current_participants || 0) / (c.min_participants || 1)) * 100);
+                const isObjectPrize = c.prize_type === 'object';
+
+                return (
+                  <div key={c.id} className="bg-slate-800 rounded-[2.5rem] border border-white/5 overflow-hidden flex flex-col group hover:scale-[1.02] transition-all shadow-2xl relative">
+                    {/* Header Media */}
+                    <div className="h-48 bg-slate-700 relative overflow-hidden flex items-end p-6">
+                      {c.media_type === 'video' || (c.image_url?.endsWith('.mp4')) ? (
+                        <video src={c.image_url} autoPlay loop muted playsInline className="absolute inset-0 w-full h-full object-cover" />
+                      ) : (
+                        <div className="absolute inset-0 bg-cover bg-center" style={{ backgroundImage: `linear-gradient(to bottom, transparent, rgba(15, 23, 42, 0.98)), url(${c.image_url})` }} />
+                      )}
+                      <h4 className="relative z-10 text-xl font-black text-white truncate drop-shadow-lg">{c.title}</h4>
                     </div>
-                    <button onClick={() => { setSelectedContest(c); setView('contest-detail'); }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-blue-500 transition-colors">Patisipe</button>
+
+                    {/* Progress Bar */}
+                    <div className="px-6 py-3 bg-slate-900/40 border-b border-white/5">
+                      <div className="flex justify-between items-center mb-1.5">
+                        <span className="text-[9px] font-black text-slate-500 uppercase tracking-widest italic">Okipasyon</span>
+                        <span className="text-[9px] font-black text-yellow-500">{Math.round(progress)}%</span>
+                      </div>
+                      <div className="h-1.5 w-full bg-slate-700/50 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-yellow-700 via-yellow-400 to-yellow-700 shadow-[0_0_12px_rgba(250,204,21,0.6)] animate-pulse"
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    <div className="p-6 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <span className="text-yellow-400 font-black">{(c.entry_fee || 0)} HTG</span>
+                        <div className="flex items-center gap-2 bg-slate-900/60 p-2 pl-3 rounded-2xl border border-white/5">
+                          <span className="text-green-400 font-black text-[10px]">
+                            {isObjectPrize ? c.prize_description : `${c.grand_prize} HTG`}
+                          </span>
+                          {isObjectPrize && c.prize_image_url && (
+                            <img src={c.prize_image_url} onClick={(e) => { e.stopPropagation(); setSelectedPrizeImage(c.prize_image_url!); }} className="w-8 h-8 rounded-lg object-cover cursor-zoom-in" />
+                          )}
+                        </div>
+                      </div>
+                      <button onClick={() => { setSelectedContest(c); setView('contest-detail'); }} className="w-full py-4 bg-blue-600 text-white font-black rounded-2xl uppercase text-[10px] tracking-widest hover:bg-blue-500 transition-colors">Patisipe</button>
+                    </div>
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

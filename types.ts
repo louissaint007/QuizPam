@@ -8,6 +8,7 @@ export interface UserProfile {
   xp: number;
   honorary_title: string;
   total_wins?: number;
+  last_level_notified: number;
   is_admin: boolean;
   avatar_url?: string;
   balance_htg: number;
@@ -20,6 +21,19 @@ export interface Wallet {
   total_deposited: number;
   total_withdrawn: number;
   total_won: number;
+}
+
+export interface Transaction {
+  id: string;
+  user_id: string;
+  amount: number;
+  type: 'deposit' | 'withdrawal' | 'entry_fee' | 'prize';
+  reference_id?: string;
+  status: 'pending' | 'completed' | 'failed';
+  created_at: string;
+  description?: string;
+  metadata?: any;
+  payment_method?: string;
 }
 
 export interface Question {
@@ -62,6 +76,7 @@ export interface Contest {
   title: string;
   category_filter?: string;
   entry_fee: number;
+  entry_fee_htg?: number; // Keep for compatibility during transition
   min_participants: number;
   current_participants: number;
   status: 'pending' | 'active' | 'finished' | 'scheduled';
@@ -83,6 +98,22 @@ export interface Contest {
   tenth_prize_percent?: number;
   questions_ids?: string[];
   has_final_round?: boolean;
+  scheduled_at?: string;
+  ends_at?: string;
+  question_count?: number;
+  max_participants?: number;
+  prize_type?: 'cash' | 'object';
+  prize_image_url?: string;
+  prize_description?: string;
+  media_type?: 'image' | 'video' | 'gif';
+}
+
+export interface ContestParticipant {
+  id: string;
+  contest_id: string;
+  user_id: string;
+  joined_at: string;
+  status: 'joined' | 'completed' | 'disqualified';
 }
 
 export interface PayoutDistribution {
@@ -100,4 +131,14 @@ export interface AdminStats {
   totalRevenue: number;
   activeContests: number;
   totalQuestions: number;
+}
+
+export interface Review {
+  id: string;
+  user_id: string;
+  username?: string;
+  avatar_url?: string;
+  rating: number;
+  comment: string;
+  created_at: string;
 }
